@@ -30,14 +30,17 @@ int main() {
     }
     int yes = 1;
     setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
-    if (bind(sockfd, rp->ai_addr, rp->ai_addrlen) == 0) {
-      break;
+    if (bind(sockfd, rp->ai_addr, rp->ai_addrlen) == -1) {
+      perror("bind");
+      close(sockfd);
+      continue;
     }
-    close(sockfd);
+    break; // binded successfully
   }
   freeaddrinfo(res);
   if (rp == NULL) {
     fprintf(stderr, "Could not bind\n");
+    close(sockfd);
     return EXIT_FAILURE;
   }
   if (listen(sockfd, 10) == -1) {
@@ -45,8 +48,23 @@ int main() {
     return EXIT_FAILURE;
   }
   printf("Server listening on port 8080\n");
-  int new_fd = accept(sockfd, (struct sockaddr *)&their_addr,
-                      &(socklen_t){sizeof(their_addr)});
-  // Do something with new_fd: send, rev data, create new thread, etc.
+  char buf[1024];
+  while (1) {
+    socklen_t addr_size = sizeof(their_addr);
+    int new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &addr_size);
+    if (new_fd == -1) {
+      perror("accept");
+      continue;
+    }
+    printf("Accepted a new connection\n");
+    // Here you can handle the new connection (new_fd)
+    int numbytes = recv(new_fd, buf, sizeof(buf) - 1, 0);
+    if (numbytes > 0) {
+      buf[numbytes] = '\0';
+      printf("Received: %s\n", buf);
+    }
+    close(new_fd); // Close the connection after handling
+  }
+  close(sockfd);
   return 0;
 }
